@@ -1,0 +1,25 @@
+<script type="text/ng-template" id="node">
+    <div class="todo">
+    	<div class="todo-content">
+    		<p ng-class="{'todo-important': row.important}">{{ row.text }}</p>
+    	</div>
+    	<div class="tags" ng-if="row.tags.length">
+    		<span ng-repeat="tag in row.tags" class="label label-{{tag.color}}">{{tag.text}}</span>
+    	</div>
+    </div>
+
+    <ul ng-if="row.children">
+        <li ng-repeat="row in row.children" ng-include="'node'"></li>
+    </ul>
+</script>
+
+<div class="text-center" style="margin-bottom: 52px;">
+	<h3>TODO APP</h3>
+	<h4>Quantidade de todos <{{data.children.length}}></h4>
+</div>
+
+<div class="container">
+	<ul>
+		<li ng-repeat="row in data.children | orderBy: '-important'" ng-include="'node'"></li>
+	</ul>
+</div>
