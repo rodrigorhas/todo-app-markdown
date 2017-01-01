@@ -20,3 +20,4 @@ browserSync({
 });
 
 console.log("[SERVER RUNNING - WAITING FOR CHANGES ON 'log.txt']");
+compiler();
