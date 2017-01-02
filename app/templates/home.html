@@ -1,7 +1,7 @@
 <script type="text/ng-template" id="node">
     <div class="todo">
     	<div class="todo-content">
-    		<p ng-class="{'todo-important': row.important}">{{ row.text }}</p>
+    		<p ng-class="{'todo-important': row.important}" ng-bind-html="row.text | trust"></p>
     	</div>
     	<div class="tags" ng-if="row.tags.length">
     		<span ng-repeat="tag in row.tags" class="label label-{{tag.color}}">{{tag.text}}</span>

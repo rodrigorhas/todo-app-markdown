@@ -158,34 +158,34 @@ function init () {
 
 			switch(arguments[0]) {
 				case "$":
-					li.important = true;
+				li.important = true;
 				break;
 
 				case "-":
-					li.type = "normal";
+				li.type = "normal";
 				break;
 
 				case "*":
-					li.type = "ul";
+				li.type = "ul";
 				break;
 
 				case "->":
-					if(!avoidChangeValue)
-						multilineMode = true;
+				if(!avoidChangeValue)
+					multilineMode = true;
 				break;
 
 				case "<-":
-					if(!avoidChangeValue)
-						multilineMode = false;
+				if(!avoidChangeValue)
+					multilineMode = false;
 				break;
 
 				case "=>":
-					li.answer = true;
+				li.answer = true;
 				break;
 
 				case "#":
-					if(!avoidChangeValue)
-						hide = true;
+				if(!avoidChangeValue)
+					hide = true;
 				break;
 
 				case "|":
@@ -208,10 +208,10 @@ function init () {
 
 			if(multilineTemplate) {
 				multilineTemplate = multilineTemplate[0]
-					.replace(/(\W)+?\-\>/, "")
-					.replace(/\-\>(\W)+?/, "")
-					.replace(/(\t)+?\<\-/, "")
-					.replace(/\<\-(\t)+?/, "");
+				.replace(/(\W)+?\-\>/, "")
+				.replace(/\-\>(\W)+?/, "")
+				.replace(/(\t)+?\<\-/, "")
+				.replace(/\<\-(\t)+?/, "");
 
 				multilineBuffer.string = multilineTemplate.split('\n');
 
@@ -278,27 +278,28 @@ function init () {
 	fs.readFile(filePath, 'utf8', (err, file) => {
 		doc = file.split(/\n/g);
 
-		for (var index = 0; index < doc.length; index++) {
-			var row = doc[index];
+		function startProcess ($arr) {
+			for (var index = 0; index < $arr.length; index++) {
+				var row = $arr[index];
 
-			++$loop;
+				++$loop;
 
-			console.log('[LOOP] :: ', $loop);
+				console.log('[LOOP] :: ', $loop);
 
-			if(multilineMode) {
-				console.log("[MTLM ON]");
-				var buffer = multilineBuffer;
+				if(multilineMode) {
+					console.log("[MTLM ON]");
+					var buffer = multilineBuffer;
 
-				processMultline(buffer.string);
+					processMultline(buffer.string);
 
-				multilineMode = false;
-			}
+					multilineMode = false;
+				}
 
-			if(
-				multilineBuffer.stopLoop &&
-				multilineBuffer.stopLoop != $loop &&
-				multilineBuffer.stopLoop > $loop) {
-				console.log("[SKIP]");
+				if(
+					multilineBuffer.stopLoop &&
+					multilineBuffer.stopLoop != $loop &&
+					multilineBuffer.stopLoop > $loop) {
+					console.log("[SKIP]");
 				continue;
 			}
 
@@ -309,159 +310,162 @@ function init () {
 
 			if(!row.length) continue;
 
-			// set vars 
+				// set vars 
 
-			var currentDepth = countMatch(row, "\t");
-			var nextRow = doc[index + 1];
-			var nextDepth = (nextRow) ? countMatch(nextRow, "\t") : null;
-			var prevRow = doc[index - 1];
-			var prevDepth = (prevRow) ? countMatch(prevRow, "\t") : null;
+				var currentDepth = countMatch(row, "\t");
+				var nextRow = doc[index + 1];
+				var nextDepth = (nextRow) ? countMatch(nextRow, "\t") : null;
+				var prevRow = doc[index - 1];
+				var prevDepth = (prevRow) ? countMatch(prevRow, "\t") : null;
 
-			var checkDepth = function () {return nextDepth && (nextDepth > currentDepth)};
-			var prevCheckDepth = function () {return prevDepth && (prevDepth < currentDepth || prevDepth == currentDepth)};
+				var checkDepth = function () {return nextDepth && (nextDepth > currentDepth)};
+				var prevCheckDepth = function () {return prevDepth && (prevDepth < currentDepth || prevDepth == currentDepth)};
 
-			var checkIfNeedChangeDepth = function ($li) {
-				if(checkDepth()) {
-					lastObj = $li;
-					trace.add(lastObj);
-				}
-			}
-
-			var getRow = function ($index) {
-
-				var $r;
-
-				if(typeof $index == "string") {
-					$r = $index;
-				}
-
-				else {
-				 	$r = (!$index) ? nextRow : doc[$index];
-				}
-
-				if(!$r) return null;
-
-				var dig = removeTabs($r)
-				var symbs = getSymbols(dig);
-				symbs = (symbs) ? symbs[0] : "";
-				dig = removeSymbols(dig);
-
-				return {
-					raw: $r,
-					digested: dig,
-					line: $loop,
-					depth: countMatch($r, "\t"),
-					symbol: symbs
-				}
-			}
-
-			processRow(row);
-
-			function processMultline (row) {
-				console.log("[START PROCESSING MTLM]");
-				var tempRow = [];
-				var buffer = multilineBuffer;
-				var diff = buffer.stopLoop - buffer.startLoop;
-
-				if(diff) {
-					var l = -1;
-
-					while(typeof ++l == "number") {
-
-						// minus 1 to get first multiline row
-						// var $nextRow = getRow(buffer.startLoop - 1 + l);
-
-						console.log('[WHILE] :: ' + l);
-
-						var $nextRow = getRow(row[l]);
-
-						console.log("[$nextRow.symbol] :: ", $nextRow.symbol || "null symbol");
-
-						if($nextRow && $nextRow.symbol == "") {
-							console.log("<ROW:"+l+">", $nextRow.digested);
-							tempRow.push($nextRow.digested);
-						}
-
-						else {
-							console.log("[WARNING] :: ", "<loop:" + $loop +">" , "<loop interno:" + l +">", $nextRow);
-							break;
-						}
-
-						if(l == row.length) break;
-					}
-
-					//console.log("[MULTLINE TEXT] :: ", tempRow);
-
-					if(tempRow.length) {
-						//console.log("[GENERATED LI] :: ", createListItem(tempRow.join("<br>"), true));
-						//console.log("[MULTLINE TEXT] :: ", tempRow);
-
-						var li = createListItem(tempRow.join(HTML.br), true);
-						lastObj.children.push(li);
-
-						checkIfNeedChangeDepth(li);
+				var checkIfNeedChangeDepth = function ($li) {
+					if(checkDepth()) {
+						lastObj = $li;
+						trace.add(lastObj);
 					}
 				}
-			}
 
-			function processRow ($row) {
-				if(currentDepth) {
+				var getRow = function ($index) {
 
-					if(prevCheckDepth() == false) hide = false;
+					var $r;
 
-					// changes hide value
-					var li = createListItem($row, false);
-
-					if(hide || multilineMode) return;
-
-					var dres = depth.hasChange(currentDepth);
-
-					if(!li) {
-						throw new Error("Missing <LI> on loop ", $loop);
-					}
-
-					if(!lastObj) {
-						lastObj = trace.last();
-					}
-
-					if(dres) {
-						if(dres == "+") {
-							lastObj.children.push(li);
-
-							li.children = [];
-
-							checkIfNeedChangeDepth(li);
-						}
-
-						else if(dres == "-") {
-							var diff = depth.oldDepth() - depth.last();
-
-							if(diff) {
-								for (var i = diff - 1; i >= 0; i--) {
-									lastObj = trace.parent();
-								}
-
-							}
-
-							lastObj.children.push(li);
-						}
+					if(typeof $index == "string") {
+						$r = $index;
 					}
 
 					else {
-						lastObj.children.push(li);
+						$r = (!$index) ? nextRow : doc[$index];
+					}
 
-						checkIfNeedChangeDepth(li);
+					if(!$r) return null;
+
+					var dig = removeTabs($r)
+					var symbs = getSymbols(dig);
+					symbs = (symbs) ? symbs[0] : "";
+					dig = removeSymbols(dig);
+
+					return {
+						raw: $r,
+						digested: dig,
+						line: $loop,
+						depth: countMatch($r, "\t"),
+						symbol: symbs
 					}
 				}
-			}
-		};
 
-		console.info("[COMPILED AT " + new Date().getTime() + "]");
+				processRow(row);
 
-		fs.writeFile("app.json", JSON.stringify(data, null, 2), "utf8", (err) => {
-			if(err)
-				throw err
-		})
+				function processMultline (row) {
+					console.log("[START PROCESSING MTLM]");
+					var tempRow = [];
+					var buffer = multilineBuffer;
+					var diff = buffer.stopLoop - buffer.startLoop;
+
+					if(diff) {
+						var l = -1;
+
+						while(typeof ++l == "number") {
+
+							// minus 1 to get first multiline row
+							// var $nextRow = getRow(buffer.startLoop - 1 + l);
+
+							console.log('[WHILE] :: ' + l);
+
+							var $nextRow = getRow(row[l]);
+
+							console.log("[$nextRow.symbol] :: ", $nextRow.symbol || "null symbol");
+
+							if($nextRow && $nextRow.symbol == "") {
+								console.log("<ROW:"+l+">", $nextRow.digested);
+								tempRow.push($nextRow.digested);
+							}
+
+							else {
+								console.log("[WARNING] :: ", "<loop:" + $loop +">" , "<loop interno:" + l +">", $nextRow);
+								break;
+							}
+
+							if(l == row.length) break;
+						}
+
+						//console.log("[MULTLINE TEXT] :: ", tempRow);
+
+						if(tempRow.length) {
+							//console.log("[GENERATED LI] :: ", createListItem(tempRow.join("<br>"), true));
+							//console.log("[MULTLINE TEXT] :: ", tempRow);
+
+							var li = createListItem(tempRow.join(HTML.br), true);
+							lastObj.children.push(li);
+
+							checkIfNeedChangeDepth(li);
+						}
+					}
+				}
+
+				function processRow ($row) {
+					if(currentDepth) {
+
+						if(prevCheckDepth() == false) hide = false;
+
+						// changes hide value
+						var li = createListItem($row, false);
+
+						if(hide || multilineMode) return;
+
+						var dres = depth.hasChange(currentDepth);
+
+						if(!li) {
+							throw new Error("Missing <LI> on loop ", $loop);
+						}
+
+						if(!lastObj) {
+							lastObj = trace.last();
+						}
+
+						if(dres) {
+							if(dres == "+") {
+								lastObj.children.push(li);
+
+								li.children = [];
+
+								checkIfNeedChangeDepth(li);
+							}
+
+							else if(dres == "-") {
+								var diff = depth.oldDepth() - depth.last();
+
+								if(diff) {
+									for (var i = diff - 1; i >= 0; i--) {
+										lastObj = trace.parent();
+									}
+
+								}
+
+								lastObj.children.push(li);
+							}
+						}
+
+						else {
+							lastObj.children.push(li);
+
+							checkIfNeedChangeDepth(li);
+						}
+					}
+				}
+			};
+
+			console.info("[COMPILED AT " + new Date().getTime() + "]");
+
+			fs.writeFile("app.json", JSON.stringify(data, null, 2), "utf8", (err) => {
+				if(err)
+					throw err
+			})
+		}
+
+		startProcess(doc);
 	})
 }
 
