@@ -1,25 +1,57 @@
+<script type="text/ng-template" id="multilineModeOn">
+	{{row.details.text}}
+
+    <ul ng-if="row.children">
+        <li ng-repeat="row in row.children | orderBy: 'id'" ng-include="'multilineModeOn'"></li>
+    </ul>
+</script>
+
+<script type="text/ng-template" id="ul">
+	{{row.details.text}}
+
+    <ul ng-if="row.children">
+        <li ng-repeat="row in row.children | orderBy: 'id'" ng-include="'ul'"></li>
+    </ul>
+</script>
+
 <script type="text/ng-template" id="node">
     <div class="todo">
     	<div class="todo-content">
-    		<p ng-class="{'todo-important': row.important}" ng-bind-html="row.text | trust"></p>
+    		<span>#ID: {{row.id}}</span>
+    		<span>#TYPE: {{row.details.type}}</span>
+    		<strong>#GIVEN: {{row.GIVEN}}</strong>
+    		<p ng-class="{'todo-important': row.details.important}" ng-bind="row.details.text | trust" ng-if="!row.reduced"></p>
+    		<div ng-if="row.reduced">
+    			<div ng-switch on="row.details.type">
+    				<ul ng-switch-when="ul">
+    					<li ng-include="'ul'" ng-repeat="row in row.children | orderBy: 'id'"></li>
+    				</ul>
+
+    				<ul ng-switch-when="multilineModeOn">
+    					<li ng-include="'multilineModeOn'" ng-repeat="row in row.children | orderBy: 'id'"></li>
+    				</ul>
+    			</div>
+    		</div>
     	</div>
-    	<div class="tags" ng-if="row.tags.length">
-    		<span ng-repeat="tag in row.tags" class="label label-{{tag.color}}">{{tag.text}}</span>
+    	<div class="tags" ng-if="row.details.tags.length">
+    		<span ng-repeat="tag in row.details.tags" class="label label-{{tag.color}}">{{tag.text}}</span>
     	</div>
     </div>
 
-    <ul ng-if="row.children">
-        <li ng-repeat="row in row.children" ng-include="'node'"></li>
+    <ul ng-if="row.children && !row.reduced">
+        <li ng-repeat="row in row.children | orderBy: 'id'" ng-include="'node'"></li>
     </ul>
 </script>
 
 <div class="text-center" style="margin-bottom: 52px;">
 	<h3>TODO APP</h3>
-	<h4>Quantidade de todos <{{data.children.length}}></h4>
+	<h4>Quantidade de todos <{{data.length}}></h4>
 </div>
 
 <div class="container">
 	<ul>
-		<li ng-repeat="row in data.children | orderBy: '-important'" ng-include="'node'"></li>
+		<li ng-repeat="row in data | orderBy: 'id' | orderBy: 'details.important'" ng-include="'node'"></li>
 	</ul>
 </div>
+
+<pre>{{data | json}}</pre>

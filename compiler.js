@@ -54,7 +54,17 @@ var matchTag = function (row) {
 		return false;
 }
 
-var countMatch = function (row, str) {
+var countMatch = function (row, symbol, str) {
+	if(symbol !== "") {
+		var splited = row.split(symbol);
+
+		if(splited) {
+			splited = splited[0];
+
+			return splited.split(str).length || 0;
+		}
+	}
+
 	return row.split(str).length || 0;
 }
 
@@ -104,369 +114,496 @@ var trim = function (row) {
 	return (row) ? row.replace(/\s+/, " ") : row;
 }
 
-function init () {
-	var $loop = 0;
-	var $index = 0;
-	var createUnorderedList = function () {
-		return {id: ++$index, children: []};
-	};
-	var data = createUnorderedList();
-	var lastObj = data;
-	var trace = [data];
+var getRow = function ($index, $loop, $doc) {
+
+	var res = {
+		raw: "",
+		digested: "",
+		line: null,
+		depth: null,
+		symbol: ""
+	}
+
+	var $r;
+
+	if(typeof $index == "string") {
+		$r = $index;
+	}
+
+	else {
+		$r = (!$index) ? null : $doc[$index];
+	}
+
+	if(!$r) return res;
+
+	var dig = removeTabs($r)
+	var symbs = getSymbols(dig);
+	symbs = (symbs) ? symbs[0] : "";
+	dig = removeSymbols(dig);
+
+	return {
+		raw: $r,
+		digested: dig,
+		line: $loop,
+		depth: countMatch($r, symbs, "\t"),
+		symbol: symbs
+	}
+}
+
+var getSymbols = function (row) {
+	return row.match(SYMBOL_REGEX);
+}
+
+var removeSymbols = function (row) {
+	return row.replace(SYMBOL_REGEX, "");
+}
+
+const SYMBOL_REGEX = /\$|\-\>|\<\-|\#|\-|\*|\=\>/;
+
+var createListItem = function (li) {
+
+	li.details = {};
+
+	var r = removeTabs(li.row);
+
 	var hide = false;
 
-	var SYMBOL_REGEX = /\$|\-\>|\<\-|\#|\-|\*|\=\>/;
+	r = r.replace(SYMBOL_REGEX, function () {
 
-	var multilineMode = false;
+		switch(arguments[0]) {
+			case "$":
+			li.details.important = true;
+			break;
 
-	var multilineBuffer = {
-		startLoop: null,
-		stopLoop: null,
-		string: "",
-		buffering: false,
+			case "-":
+			li.details.type = "normal";
+			break;
 
-		clear: function () {
-			this.startLoop = null;
-			this.stopLoop = null;
-			this.buffering = false;
-			this.string = "";
+			case "*":
+			li.details.type = "ul";
+			break;
+
+			case "->":
+				//multilineMode = true;
+				li.details.type = "multilineModeOn";
+			break;
+
+			case "<-":
+				//multilineMode = false;
+			break;
+
+			case "=>":
+			li.details.answer = true;
+			break;
+
+			case "#":
+				hide = true;
+			break;
+
+			case "|":
+			break;
 		}
-	};
 
-	var doc = null;
+		return "";
+	});
 
-	var getSymbols = function (row) {
-		return row.match(SYMBOL_REGEX);
+	if(hide) return;
+
+	console.log("[ITEM NORMAL]");
+
+	var extractedTags = extractTags(r);
+
+	r = trim(extractedTags.row);
+
+	if(extractedTags.matches.length) {
+		li.details.tags = extractedTags.matches;
 	}
 
-	var removeSymbols = function (row) {
-		return row.replace(SYMBOL_REGEX, "");
+	else { // add default tag [em aberto]
+		li.details.tags = [new Tag("em aberto", "danger")];
 	}
 
-	var createListItem = function (row, avoidChangeValue) {
-		var li = {id: ++$index, children: [], tags: []};
-
-		var r = removeTabs(row);
-
-		var hasSymbol = false;
-
-		r = r.replace(SYMBOL_REGEX, function () {
-
-			hasSymbol = true;
-
-			console.log("[ROW SYMBOL] :: ", arguments[0]);
-
-			switch(arguments[0]) {
-				case "$":
-				li.important = true;
-				break;
-
-				case "-":
-				li.type = "normal";
-				break;
-
-				case "*":
-				li.type = "ul";
-				break;
-
-				case "->":
-				if(!avoidChangeValue)
-					multilineMode = true;
-				break;
-
-				case "<-":
-				if(!avoidChangeValue)
-					multilineMode = false;
-				break;
-
-				case "=>":
-				li.answer = true;
-				break;
-
-				case "#":
-				if(!avoidChangeValue)
-					hide = true;
-				break;
-
-				case "|":
-				break;
-			}
-
-			return "";
-		});
-
-		if(!hasSymbol && !multilineMode) {
-			console.log("sem symbol e fora do mtlmode");
-			return;
-		}
-
-		if(!avoidChangeValue && multilineMode && !multilineBuffer.buffering) {
-			console.log("[MTLM] :: ", "on");
-			multilineBuffer.startLoop = $loop;
-
-			var multilineTemplate = doc.slice($loop -1).join('\n').match(/\-\>([^\<\-]+)\<\-/);
-
-			if(multilineTemplate) {
-				multilineTemplate = multilineTemplate[0]
-				.replace(/(\W)+?\-\>/, "")
-				.replace(/\-\>(\W)+?/, "")
-				.replace(/(\t)+?\<\-/, "")
-				.replace(/\<\-(\t)+?/, "");
-
-				multilineBuffer.string = multilineTemplate.split('\n');
-
-				// count including empty rows
-				multilineBuffer.stopLoop = multilineBuffer.startLoop + multilineBuffer.string.length;
-
-				// skip empty rows
-				multilineBuffer.string = multilineBuffer.string.filter(function (a) {if(/\w+[^\\t]/.test(a)) return a});
-			}
-
-			console.log(multilineBuffer);
-
-			return;
-		}
-
-		if(hide) return;
-
-		console.log("[ITEM NORMAL]");
-
-		var extractedTags = extractTags(r);
-
-		r = trim(extractedTags.row);
-
-		if(extractedTags.matches.length) {
-			li.tags = extractedTags.matches;
-		}
-
-		else { // add default tag [em aberto]
-			li.tags = [new Tag("em aberto", "danger")];
-		}
-
-		if(li.important) {
-			li.tags.push(new Tag("urgente", "important"))
-		}
-
-		if(li.tags.length > 1) li.tags.sort();
-
-		var getFirstWordPosition = function (row) {
-			var m = row.match(/\w/);
-			return (m) ? m.index : 0;
-		}
-
-		li.text = r.substring(getFirstWordPosition(r));
-
-		console.log(li);
-
-		return li;
+	if(li.details.important) {
+		li.details.tags.push(new Tag("urgente", "important"))
 	}
 
-	trace.last = function () {
-		var l = this.slice(-1);
-		return (l.length) ? l[0] : data;
+	if(li.details.tags.length > 1) li.details.tags.sort();
+
+	var getFirstWordPosition = function (row) {
+		var m = row.match(/\w/);
+		return (m) ? m.index : 0;
 	}
 
-	trace.parent = function () {
-		this.pop();
-		return this.last();
-	}
+	li.details.text = r.substring(getFirstWordPosition(r));
 
-	trace.add = function (o) {
-		this.push(o);
-	}
+	//console.log(li);
 
+	return li;
+}
+
+function init () {
 	fs.readFile(filePath, 'utf8', (err, file) => {
-		doc = file.split(/\n/g);
+		const doc = file.split(/\n/g);
 
-		function startProcess ($arr) {
-			for (var index = 0; index < $arr.length; index++) {
-				var row = $arr[index];
+		function start ($arr) {
+			var data = [];
+			var response = {};
 
-				++$loop;
+			// #block 1
+			var $baseItemUniqueId = 0;
+			var $skip = 0;
 
-				console.log('[LOOP] :: ', $loop);
-
-				if(multilineMode) {
-					console.log("[MTLM ON]");
-					var buffer = multilineBuffer;
-
-					processMultline(buffer.string);
-
-					multilineMode = false;
-				}
-
-				if(
-					multilineBuffer.stopLoop &&
-					multilineBuffer.stopLoop != $loop &&
-					multilineBuffer.stopLoop > $loop) {
-					console.log("[SKIP]");
-				continue;
+			var createBaseItem = function (uId) {
+				return {id: uId || ++$baseItemUniqueId, children: []}
 			}
 
-			if(multilineMode) {
-				multilineMode = false;
-				multilineBuffer.clear();
-			}
+			var Create = {
+				multilineModeOn: function ($arr) {
 
-			if(!row.length) continue;
-
-				// set vars 
-
-				var currentDepth = countMatch(row, "\t");
-				var nextRow = doc[index + 1];
-				var nextDepth = (nextRow) ? countMatch(nextRow, "\t") : null;
-				var prevRow = doc[index - 1];
-				var prevDepth = (prevRow) ? countMatch(prevRow, "\t") : null;
-
-				var checkDepth = function () {return nextDepth && (nextDepth > currentDepth)};
-				var prevCheckDepth = function () {return prevDepth && (prevDepth < currentDepth || prevDepth == currentDepth)};
-
-				var checkIfNeedChangeDepth = function ($li) {
-					if(checkDepth()) {
-						lastObj = $li;
-						trace.add(lastObj);
+					var item = {
+						id: $arr[0].id,
+						children: $arr,
+						depth: $arr[0].depth,
+						row: $arr[0].row,
+						parent: $arr[0].parent,
+						digested: $arr[0].digested,
+						symbol: $arr[0].symbol,
+						details: $arr[0].details,
 					}
+
+					var text = "";
+
+					item.children = item.children.filter(function ($item) {
+						if($item.details.type == "normal") {
+							text += $item.details.text;
+
+							return false;
+						}
+
+						return true;
+					})
+
+					item.details.text = text;
+
+					item.children = item.children.map(function ($i) {
+						$i.parent = item.id;
+						return $i;
+					});
+
+					item.details.type = "multilineModeOn";
+
+					item.reduced = true;
+
+					return item;
+				},
+
+				ul: function ($arr) {
+
+					var item = {
+						id: $arr[0].id,
+						children: $arr,
+						depth: $arr[0].depth,
+						row: $arr[0].row,
+						parent: $arr[0].parent,
+						digested: $arr[0].digested,
+						symbol: $arr[0].symbol,
+						details: $arr[0].details,
+					}
+
+					item.children = item.children.map(function ($i) {
+						$i.parent = item.id;
+						return $i;
+					})
+
+					item.reduced = true;
+
+					return item;
+				},
+
+				normal: function ($arr) {
+					console.log('###################################3');
+					var item = createBaseItem($arr[0].id);
+
+					item.type = "normal";
+
+					item.children = $arr;
+					
+					return $arr;
+				}
+			}
+
+			$arr.forEach(function ($row, index) {
+
+				if($row == "") {
+					++$skip;
+					return false;
 				}
 
-				var getRow = function ($index) {
+				//console.log("[ROW] :: ", $row);
 
-					var $r;
+				var currentDepth = countMatch($row, getRow($row, null, $arr).symbol, "\t");
+				var nextRow = data[index + 1 - $skip];
+				var nextDepth = (nextRow) ? countMatch(nextRow, getRow(nextRow, null, $arr).symbol, "\t") : null;
+				var prevRow = data[index - 1 - $skip];
+				var prevDepth = (prevRow) ? prevRow.depth : null;
 
-					if(typeof $index == "string") {
-						$r = $index;
+				/*console.log("[PREV] :: ", prevDepth);
+				console.log("[CURR] :: ", currentDepth);
+				console.log("[NEXT] :: ", nextDepth);*/
+
+				var checkNextDepth = function () {return nextDepth && (nextDepth > currentDepth)};
+				var prevDepthIsLess = function () {return prevDepth && (prevDepth < currentDepth)};
+				var prevDepthIsEqual = function () {return prevDepth && (prevDepth == currentDepth)};
+
+				var item = createBaseItem();
+
+				item.depth = currentDepth;
+				item.row = $row;
+
+				if(prevDepthIsLess()) {
+					item.parent = prevRow.id;
+				}
+
+				else if(prevDepthIsEqual()) {
+					item.parent = prevRow.parent;
+				}
+
+				else {
+					if(item.depth == 1 || index == 0) {
+						item.parent = 0;
 					}
 
 					else {
-						$r = (!$index) ? nextRow : doc[$index];
-					}
-
-					if(!$r) return null;
-
-					var dig = removeTabs($r)
-					var symbs = getSymbols(dig);
-					symbs = (symbs) ? symbs[0] : "";
-					dig = removeSymbols(dig);
-
-					return {
-						raw: $r,
-						digested: dig,
-						line: $loop,
-						depth: countMatch($r, "\t"),
-						symbol: symbs
+						item.parent = item.depth - 1;
 					}
 				}
 
-				processRow(row);
+				data.push(item);
+			});
 
-				function processMultline (row) {
-					console.log("[START PROCESSING MTLM]");
-					var tempRow = [];
-					var buffer = multilineBuffer;
-					var diff = buffer.stopLoop - buffer.startLoop;
+			/*console.log("## DATA ##");
+			console.log(data.map(function (d) {
+				return {id: d.id, depth: d.depth -1, parent: d.parent}
+			}));*/
 
-					if(diff) {
-						var l = -1;
+			data = data.sort(function (itemA, itemB) {
+				var keyA = itemA.depth;
+				var keyB = itemB.depth;
 
-						while(typeof ++l == "number") {
+				if(keyA < keyB) return -1;
+			    if(keyA > keyB) return 1;
+			    return 0;
+			});
 
-							// minus 1 to get first multiline row
-							// var $nextRow = getRow(buffer.startLoop - 1 + l);
+			//console.log(data);
 
-							console.log('[WHILE] :: ' + l);
+			// #block 2
 
-							var $nextRow = getRow(row[l]);
+			function recursive ($recArr) {
 
-							console.log("[$nextRow.symbol] :: ", $nextRow.symbol || "null symbol");
+				if(!$recArr.length) {
+					/*console.log('## END RECURSIVE ##');
+					console.log('## RETURNING ##');
+					console.log(null);*/
+					return null;
+				}
 
-							if($nextRow && $nextRow.symbol == "") {
-								console.log("<ROW:"+l+">", $nextRow.digested);
-								tempRow.push($nextRow.digested);
+				//console.log("[RECURSIVE ARR] :: ", $recArr);
+
+				//console.log("[RECURSIVE DEPTH :: ]");
+
+				var max_depth = (function () {
+					return Math.max.apply(null, $recArr.map(function (m) {
+						return m.depth;
+					}));
+				})()
+				
+				if(!isFinite(max_depth)) {
+					/*console.log('## END RECURSIVE ##');
+					console.log('## RETURNING ##');
+					console.log($recArr);*/
+					return null;
+				}
+
+				//console.log("[MAX_DEPTH] :: ", max_depth);
+
+				var sliceAt = {
+					first: (function () {
+						return $recArr.map(function (m) {
+							return m.depth;
+						}).indexOf(max_depth)
+					})(),
+					last: (function () {
+						return $recArr.map(function (m) {
+							return m.depth;
+						}).lastIndexOf(max_depth);
+					})()
+				}
+
+				var sliced = $recArr.slice(sliceAt.first, sliceAt.last + 1);
+
+				/*console.log("[SLICEAT] :: ", sliceAt);
+
+				console.log("[PROCESSING DEPTH] :: ", max_depth, sliced.length);*/
+
+				sliced = sliced.map(function ($s) {
+					var row = getRow($s.row);
+
+					var item = $s;
+
+					item.digested = row.digested;
+					item.symbol = row.symbol;
+
+					return createListItem(item);
+
+					//console.log(item);
+				});
+
+
+				// NORMALIZE SLICED
+
+
+				sliced = sliced.map(function ($s) {
+					if($s.type) {
+						console.log("[SLICED TYPE]", $s.type);
+					}
+
+					else return $s;
+				});
+
+				if(sliceAt.first == -1) {
+					/*console.log('## END RECURSIVE ##');
+					console.log('## RETURNING ##');
+					console.log(sliced.length);*/
+					return sliced;
+				}
+
+				//console.log("[LASTRECURSIVE SLICE] :: ", "(0, "+ sliceAt.first +")");
+
+				var lastRecursive = recursive($recArr.slice(0, sliceAt.first));
+
+				response[max_depth] = sliced;
+
+				return lastRecursive || sliced;
+			}
+
+			function createTree (obj) {
+				var keys = Object.keys(obj);
+				var $res = null;
+
+				for (var i = keys.length - 1; i >= 0; i--) {
+					var depth = keys[i];
+
+					var types = {};
+
+					obj[depth].forEach(function ($s) {
+						if(!$s.details.type) {
+							$s.details.type = "normal";
+						}
+
+						if(!types[$s.details.type])
+							types[$s.details.type] = []
+						
+						types[$s.details.type].push($s);
+
+					});
+
+					if(Object.keys(types).length) {
+						//console.log("[TYPE KEYS] :: ", Object.keys(types));
+						//console.log(types);
+
+						//console.log("[obj[depth] Before] :: ", obj[depth]);
+						obj[depth] = [];
+
+						for(var keyType in types) {
+							var $typeArr = types[keyType];
+
+							if(Create[keyType]) {
+								//console.log("[TRANSFORMING KEY] :: ", keyType);
+
+								var toPush = Create[keyType]($typeArr);
+
+								if(Array.isArray(toPush)) {
+									obj[depth].push.apply(obj[depth], toPush);
+								}
+
+								else {
+									if(toPush.GIVEN) console.log("[AAAAAAAA MLK]");
+									obj[depth].push(toPush);
+								}
+
+								//console.log('[obj[depth] After] :: ', obj[depth].length, $typeArr.length);
+								//console.log("[TRANFORMED] :: ", toPush);
 							}
 
 							else {
-								console.log("[WARNING] :: ", "<loop:" + $loop +">" , "<loop interno:" + l +">", $nextRow);
-								break;
+								//console.log("[MISSING KEY TYPE] :: ", keyType);
+								//console.log("[obj[depth].length before] :: ", obj[depth].length);
+								obj[depth].push.apply(obj[depth], $typeArr);
+								//console.log("[obj[depth].length after] :: ", obj[depth].length);
 							}
 
-							if(l == row.length) break;
 						}
 
-						//console.log("[MULTLINE TEXT] :: ", tempRow);
-
-						if(tempRow.length) {
-							//console.log("[GENERATED LI] :: ", createListItem(tempRow.join("<br>"), true));
-							//console.log("[MULTLINE TEXT] :: ", tempRow);
-
-							var li = createListItem(tempRow.join(HTML.br), true);
-							lastObj.children.push(li);
-
-							checkIfNeedChangeDepth(li);
-						}
+						/*console.log("[ul formeds] :: ", obj[depth].filter(function ($f) {
+							return $f.GIVEN == true;
+						}).length)*/
 					}
-				}
 
-				function processRow ($row) {
-					if(currentDepth) {
+					obj[depth].forEach(function ($item) {
+						if($item.GIVEN) console.log("[AAA MLK 2] :: ", $item)
+						if($item.parent) {
+							var prevDepth = obj[depth-1];
 
-						if(prevCheckDepth() == false) hide = false;
+							if(prevDepth) {
 
-						// changes hide value
-						var li = createListItem($row, false);
+								prevDepth.forEach(function ($prevItem) {
 
-						if(hide || multilineMode) return;
-
-						var dres = depth.hasChange(currentDepth);
-
-						if(!li) {
-							throw new Error("Missing <LI> on loop ", $loop);
-						}
-
-						if(!lastObj) {
-							lastObj = trace.last();
-						}
-
-						if(dres) {
-							if(dres == "+") {
-								lastObj.children.push(li);
-
-								li.children = [];
-
-								checkIfNeedChangeDepth(li);
-							}
-
-							else if(dres == "-") {
-								var diff = depth.oldDepth() - depth.last();
-
-								if(diff) {
-									for (var i = diff - 1; i >= 0; i--) {
-										lastObj = trace.parent();
+									if($prevItem.id == $item.parent) {
+										if($item.GIVEN) console.log();
+										$prevItem.children.push($item);
 									}
-
-								}
-
-								lastObj.children.push(li);
+								});
 							}
 						}
 
 						else {
-							lastObj.children.push(li);
-
-							checkIfNeedChangeDepth(li);
+							$res = obj[depth];
+							return;
 						}
-					}
+					});
 				}
-			};
 
-			console.info("[COMPILED AT " + new Date().getTime() + "]");
+				return $res;
+			}
 
-			fs.writeFile("app.json", JSON.stringify(data, null, 2), "utf8", (err) => {
-				if(err)
-					throw err
-			})
+			recursive(data);
+
+			WriteFile(createTree(response));
 		}
 
-		startProcess(doc);
-	})
+		function WriteFile (data) {
+			var $data;
+
+			console.log("[DATA]", data);
+
+			try {
+				$data = JSON.stringify(data, null, 2);
+
+				fs.writeFile("app.json", $data, "utf8", (err) => {
+					if(err)
+						throw new Error(err);
+				});
+			}
+
+			catch (e) {
+				throw new Error(e);
+			}
+
+		}
+
+		start(doc);
+	});
 }
 
 module.exports = init;
